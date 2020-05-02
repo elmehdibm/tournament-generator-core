@@ -1,21 +1,33 @@
-var LastNodesNumber = 1;
+/* General Util Functions */
 
-var PlayersNumber = 0;
+function is_Int(number) {
+    return (number % 1 === 0);
+};
 
-var index = 0;
+function is_StrictlyFloat(number) {
+    return (number % 1 !== 0);
+};
 
-var inMemoryBFS = [];
+function generateRandomIntTo(max) {
+    return parseInt((Math.random() * 1000000).toFixed()) % max;
+};
 
-var Players = [];
+/**      The Process of handling the binary Tree       **/
 
-var principalNode = null;
-
-var nodesRegisterByPlayer = {};
-
+// Global Variables :
+var inMemoryNodesInSameLevel = [];
+var lastNodesNumber = 1;
+var totalActiveNodes = 0;
 var nodesRegisterByTreeLevel = {};
-
 var levelVariable = 0;
+var index = 0;
+function getInitialNodeInfo() {
+    return {
+        "state": "idle"
+    };
+};
 
+// MODEL OF A NODE
 function Node(info) {
     this.info = info;
     this.subNodeLeft = null;
@@ -28,57 +40,31 @@ function Node(info) {
         }
         return "Node-" + this.info.player.name;
     }
-}
+};
 
-function Player(name) {
-    this.name = name;
-}
-
-function is_Int(number) {
-    return (number % 1 === 0);
-}
-
-function is_StrictlyFloat(number) {
-    return (number % 1 !== 0);
-}
-
-function generateRandomIntTo(max) {
-    return parseInt((Math.random() * 1000000).toFixed()) % max;
-}
-
-function generateRandomelyPlayersList(array) {
-    PlayersNumber = array.length;
-    const listOfRandomes = [];
-    const newArray = [];
-    var i = 0;
-    while (i < PlayersNumber) {
-        var random = generateRandomIntTo(PlayersNumber);
-        if (!listOfRandomes.includes(random)) {
-            newArray[random] = array[i];
-            listOfRandomes.push(random);
-            i++;
-        };
-    };
-    Players = newArray;
-}
-
-function constructTree() {
-    if (LastNodesNumber < PlayersNumber) {
+/**
+ * 
+ * Construction of the binary tree where each node
+ *      can have 2 children node or none
+ * 
+ * note 1 : It's not a pure function ( it uses global variables )
+ * note 2 : It's a recursive function each call we manage one level and we repeat
+ * note 3 : It constructs nodes level by level and keep in each level in the variable 'inMemoryNodesInSameLevel'
+ * note 4 : It initially gives all nodes an idle information by 'getInitialNodeInfo'
+ * 
+ * ╟╟╟ Instructions to Implement it to other systems ╟╟╟
+ *      1 - Create the principal node that represents all the tree ( it's the source node in the tree )
+ *      2 - Add the principal node in inMemoryNodesInSameLevel and in nodesRegisterByTreeLevel
+ *      3 - Override the getInitialNodeInfo
+ *      4 - Call constructBinaryTree()
+ */
+function constructBinaryTree() {
+    if (lastNodesNumber < totalActiveNodes) {
         var allChilds = [];
-        for (var k = 0; k < inMemoryBFS.length; k++) {
-            LastNodesNumber++;
-            var nodeLeft = new Node(
-                {
-                    "player": new Player("x"),
-                    "state": "idle"
-                }
-            );
-            var nodeRight = new Node(
-                {
-                    "player": new Player("x"),
-                    "state": "idle"
-                }
-            );
+        for (var k = 0; k < inMemoryNodesInSameLevel.length; k++) {
+            lastNodesNumber++;
+            var nodeLeft = new Node(getInitialNodeInfo());
+            var nodeRight = new Node(getInitialNodeInfo());
             index += 2;
             if (levelVariable === 0) {
                 nodeLeft.level = 1;
@@ -86,7 +72,7 @@ function constructTree() {
                 nodesRegisterByTreeLevel[1] = [nodeLeft, nodeRight];
                 levelVariable++;
             } else if (levelVariable >= 1) {
-                var newLevel = Math.log2(inMemoryBFS.length) + 1;
+                var newLevel = Math.log2(inMemoryNodesInSameLevel.length) + 1;
                 nodeLeft.level = newLevel;
                 nodeRight.level = newLevel;
                 if (nodesRegisterByTreeLevel[newLevel] === undefined) {
@@ -95,18 +81,139 @@ function constructTree() {
                     nodesRegisterByTreeLevel[newLevel].push(nodeLeft, nodeRight);
                 }
             }
-            inMemoryBFS[k].subNodeLeft = nodeLeft;
-            inMemoryBFS[k].subNodeRight = nodeRight;
-            nodeLeft.parentNode = inMemoryBFS[k];
-            nodeRight.parentNode = inMemoryBFS[k];
+            inMemoryNodesInSameLevel[k].subNodeLeft = nodeLeft;
+            inMemoryNodesInSameLevel[k].subNodeRight = nodeRight;
+            nodeLeft.parentNode = inMemoryNodesInSameLevel[k];
+            nodeRight.parentNode = inMemoryNodesInSameLevel[k];
 
             allChilds.push(nodeLeft);
             allChilds.push(nodeRight);
         }
-        inMemoryBFS = allChilds;
-        constructTree();
+        inMemoryNodesInSameLevel = allChilds;
+        constructBinaryTree();
     }
-}
+};
+
+/**
+ * 
+ * @param {the node that we'll transform all its descendants} node 
+ * @param {it's a function that receive a node and return the updated node} nodeTransformer 
+ * 
+ * note : 
+ */
+function updateDescendantNodesUsingBfs(node, nodeTransformer) {
+    if(node !== null && node.subNodeLeft !== null){
+        nodeTransformer(node.subNodeLeft);
+        updateDescendantNodesUsingBfs(node.subNodeLeft, nodeTransformer);
+    }
+    if(node !== null && node.subNodeRight !== null){
+        nodeTransformer(node.subNodeRight);
+        updateDescendantNodesUsingBfs(node.subNodeRight, nodeTransformer);
+    }
+};
+
+function killNodeAndTransferParentDataToRemainingChildAndHydrateDescendantLevels(node) {
+    var theParentNode = node.parentNode
+    if(theParentNode){
+        var sibblingNode = (
+            (theParentNode.subNodeLeft === node)
+            ? theParentNode.subNodeRight
+            : theParentNode.subNodeLeft
+        );
+        // remove the node from nodesRegisterByTreeLevel and kill it
+        nodesRegisterByTreeLevel[node.level].splice(
+            nodesRegisterByTreeLevel[node.level].findIndex(n => n === node),
+            1
+        );
+        node = null;
+        // Transfer Parent Data to sibblingNode
+        sibblingNode.info = theParentNode.info;
+        // Link Parent of theParentNode with sibblingNode if exist
+        if(theParentNode.parentNode) {
+            // Update the parent of parentNode by updating its children
+            if(theParentNode.parentNode.subNodeLeft === theParentNode) {
+                theParentNode.parentNode.subNodeLeft = sibblingNode;
+            } else {
+                theParentNode.parentNode.subNodeRight = sibblingNode;
+            }
+        }
+        // Update the sibblingNode by adding new Parent
+        sibblingNode.parentNode = theParentNode.parentNode;
+        // Update the sibblingNode position in the nodesRegisterByTreeLevel
+        var positionOfParentInRegistry = nodesRegisterByTreeLevel[theParentNode.level].findIndex(n => n === theParentNode);
+        // Place it in the position
+        nodesRegisterByTreeLevel[theParentNode.level][positionOfParentInRegistry] = sibblingNode;
+        // Remove it from the old position
+        nodesRegisterByTreeLevel[sibblingNode.level].splice(
+            nodesRegisterByTreeLevel[sibblingNode.level].findIndex(n => n === sibblingNode),
+            1
+        );
+        // Refresh his new level
+        sibblingNode.level = theParentNode.level;
+        // Now Killing theParentNode Since we tranfer its data and its antecedants
+        theParentNode = null;
+        // Hydration of the children of the updated sibblingNode to refresh their new levels
+        var decrementLevelNodeTransformer = function (node){
+            node.level = Math.max(0, node.level - 1);
+        };
+        updateDescendantNodesUsingBfs(sibblingNode, decrementLevelNodeTransformer);
+        return 1;
+    }
+    return 0;
+};
+
+function extendLastNodeWithNewSibbling(node, infoNewSibbling) {
+    if(node.subNodeLeft === null && node.subNodeRight === null){
+        node.subNodeLeft = new Node(node.info);
+        node.info = node.parentNode.info;
+        node.subNodeRight = new Node(infoNewSibbling);
+        node.subNodeLeft.level = node.level + 1;
+        node.subNodeRight.level = node.level + 1;
+        return 1;
+    }
+    return 0;
+};
+
+/**  End of the management of tree  **/
+
+// Preparing the 
+
+var Players = [];
+var nodesRegisterByPlayer = {};
+
+// MODEL OF PLAYER
+function Player(name) {
+    this.name = name;
+};
+
+/** return {  }
+ * 
+ * note : 
+ */
+function getIdleInfoPlayer() {
+    return {
+        "player": new Player("x"),
+        "state": "idle",
+    };
+};
+
+function generateRandomelyPlayersList(array) {
+    totalActiveNodes = array.length;
+    const listOfRandomes = [];
+    const newArray = [];
+    var i = 0;
+    while (i < totalActiveNodes) {
+        var random = generateRandomIntTo(totalActiveNodes);
+        if (!listOfRandomes.includes(random)) {
+            newArray[random] = array[i];
+            listOfRandomes.push(random);
+            i++;
+        };
+    };
+    Players = newArray;
+};
+
+// The Tournament Board System that will implements the binary TREE
 
 function TournamentBoard(players) {
     this.players = players;
@@ -131,9 +238,6 @@ function TournamentBoard(players) {
                 parent.subNodeRight.info.player.name = "";
                 this.nodesRegisterByPlayer[namePlayer] = parent;
                 this.numberOfMutations++;
-                if (this.numberOfMutations > 1000000) {
-                    this.numberOfMutations = 0;
-                }
             } else if (parent
                 && parent.subNodeRight !== node
                 && parent.subNodeRight.info.player.name !== "x"
@@ -143,41 +247,39 @@ function TournamentBoard(players) {
                 parent.subNodeLeft.info.player.name = "";
                 this.nodesRegisterByPlayer[namePlayer] = parent;
                 this.numberOfMutations++;
-                if (this.numberOfMutations > 1000000) {
-                    this.numberOfMutations = 0;
-                }
             }
         }
     };
     this.construct = function construct() {
         this.numberOfMutations++;
-        if (this.numberOfMutations > 1000000) {
-            this.numberOfMutations = 0;
-        }
         this.tree = new Node({
             "player": new Player("x"),
             "state": "winner"
         });
-        principalNode = this.tree;
+        // Start the creation of the tree
+        inMemoryNodesInSameLevel.push(this.tree);
         nodesRegisterByTreeLevel[0] = [this.tree];
-        inMemoryBFS.push(principalNode);
-        constructTree();
+        getInitialNodeInfo = getIdleInfoPlayer;
+        constructBinaryTree();
+        // End the creation of the tree
         this.nodesRegisterByTreeLevel = nodesRegisterByTreeLevel;
         var emptyPlayerNodes = [];
-        for (var k = 0; k < inMemoryBFS.length; k++) {
+        // Now inMemoryNodesInSameLevel will presents the nodes in the final Level of tree ( the depth of tree )
+        for (var k = 0; k < inMemoryNodesInSameLevel.length; k++) {
             if (this.players[k] === undefined) {
-                inMemoryBFS[k].info.player.name = "NaN";
-                inMemoryBFS[k].info.state = "looser";
-                emptyPlayerNodes.push(inMemoryBFS[k]);
+                inMemoryNodesInSameLevel[k].info.player.name = "NaN";
+                inMemoryNodesInSameLevel[k].info.state = "looser";
+                emptyPlayerNodes.push(inMemoryNodesInSameLevel[k]);
             } else {
-                inMemoryBFS[k].info.player.name = this.players[k];
-                nodesRegisterByPlayer[this.players[k]] = inMemoryBFS[k];
+                inMemoryNodesInSameLevel[k].info.player.name = this.players[k];
+                nodesRegisterByPlayer[this.players[k]] = inMemoryNodesInSameLevel[k];
             }
         };
         console.group("Hydration of the tree");
         console.log("Managing players with no oponenents and empty cases");
         console.log("the List of players are :", this.players);
         console.log("the empty player nodes are :", emptyPlayerNodes);
+        console.log("Inside the inMemoryNodesInSameLevel ", inMemoryNodesInSameLevel);
         // The Dept of correcting exceptions is just handling non presence of 4 players in the tree (it's working for a board of 8 players and below)
         console.log("Number of empty players is ", emptyPlayerNodes.length);
         
@@ -260,18 +362,20 @@ function TournamentBoard(players) {
         console.groupEnd();
         this.nodesRegisterByPlayer = nodesRegisterByPlayer;
     };
-}
+};
 
+
+// The Function that clear memory by resetting global variables
 function flushData() {
-    LastNodesNumber = 1;
+    lastNodesNumber = 1;
     index = 0;
-    inMemoryBFS = [];
-    principalNode = null;
+    inMemoryNodesInSameLevel = [];
     levelVariable = 0;
     nodesRegisterByPlayer = {};
     nodesRegisterByTreeLevel = [];
     Players = [];
-}
+};
+
 
 function Triplet(parentNode, subNode1, subNode2) {
      this.parentNode = parentNode;
@@ -361,7 +465,7 @@ function MatrixNavigationByDirection(matrix) {
     this.matrix = matrix;
     this.x = 0;
     this.y = 0;
-}
+};
 
 function createNavigationScreenSystem(nodesRegisterByTreeLevel) {
     console.group("Navigation Screens System Creation");
@@ -425,7 +529,7 @@ function createNavigationScreenSystem(nodesRegisterByTreeLevel) {
     console.log("the nav2dScreens is : ", nav2dScreens);
     console.groupEnd();
     return new MatrixNavigationByDirection(nav2dScreens);
-}
+};
 
 export default function Main(
     namesOfPlayers,
