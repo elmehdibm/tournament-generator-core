@@ -49,7 +49,7 @@ function Node(info) {
  * 
  * note 1 : It's not a pure function ( it uses global variables )
  * note 2 : It's a recursive function each call we manage one level and we repeat
- * note 3 : It constructs nodes level by level and keep in each level in the variable 'inMemoryNodesInSameLevel'
+ * note 3 : It constructs nodes level by level and keep in memory nodes on each level in the variable 'inMemoryNodesInSameLevel'
  * note 4 : It initially gives all nodes an idle information by 'getInitialNodeInfo'
  * 
  * ╟╟╟ Instructions to Implement it to other systems ╟╟╟
@@ -99,7 +99,7 @@ function constructBinaryTree() {
  * @param {the node that we'll transform all its descendants} node 
  * @param {it's a function that receive a node and return the updated node} nodeTransformer 
  * 
- * note : 
+ * note : The Rule in nodeTransformer : Don't modify any descendant node except the node in argument of nodeTransformer
  */
 function updateDescendantNodesUsingBfs(node, nodeTransformer) {
     if(node !== null && node.subNodeLeft !== null){
@@ -110,6 +110,57 @@ function updateDescendantNodesUsingBfs(node, nodeTransformer) {
         nodeTransformer(node.subNodeRight);
         updateDescendantNodesUsingBfs(node.subNodeRight, nodeTransformer);
     }
+};
+
+// Node Transformers
+
+//  Decrement the level of a node and handle its position in tree registry
+function decrementLevelNodeTransformer(node){
+    var parent = node.parentNode;
+    if(parent){
+        var isLeftNode = (parent.subNodeLeft === node);
+        // Getting his sibblingNode
+        var sibblingNode = (
+            isLeftNode
+            ?   parent.subNodeRight
+            :   parent.subNodeLeft
+        );
+        // Get Current Level Node In Registry Tree
+        var currentRegistryLevel = nodesRegisterByTreeLevel[node.level];
+        var upRegistryLevel = nodesRegisterByTreeLevel[node.level - 1];
+        // Checking If its Sibbling is already in the up registry
+        var indexOfSibblingInUpRegistry = upRegistryLevel.find(n => n === sibblingNode);
+        if(Boolean(indexOfSibblingInUpRegistry)){
+            // Means that node has already alocated space
+            if(isLeftNode) {
+                upRegistryLevel[indexOfSibblingInUpRegistry - 1] = node;
+            }
+            else {
+                upRegistryLevel[indexOfSibblingInUpRegistry + 1] = node;
+            }
+        } else {
+            // Alocating space for sibblingNode and placing the node in the up registry
+            // It's a binary tree we'll have always 2 nodes to add then we'll alocate a table of 2 nodes
+            // We divise by 2 because in binary tree we can predict the up level number of nodes
+            var newIndexInUpRegistry = Math.round(currentRegistryLevel.findIndex(n => n === node) / 2);
+            if(isLeftNode) {
+                upRegistryLevel.splice(
+                    newIndexInUpRegistry,
+                    0,
+                    node,
+                    null
+                );
+            } else {
+                upRegistryLevel.splice(
+                    newIndexInUpRegistry,
+                    0,
+                    null,
+                    node
+                );
+            }
+        }
+    }
+    node.level = Math.max(0, node.level - 1);
 };
 
 function killNodeAndTransferParentDataToRemainingChildAndHydrateDescendantLevels(node) {
@@ -139,11 +190,11 @@ function killNodeAndTransferParentDataToRemainingChildAndHydrateDescendantLevels
         }
         // Update the sibblingNode by adding new Parent
         sibblingNode.parentNode = theParentNode.parentNode;
-        // Update the sibblingNode position in the nodesRegisterByTreeLevel
+        // Updating the sibblingNode position in the nodesRegisterByTreeLevel
         var positionOfParentInRegistry = nodesRegisterByTreeLevel[theParentNode.level].findIndex(n => n === theParentNode);
         // Place it in the position
         nodesRegisterByTreeLevel[theParentNode.level][positionOfParentInRegistry] = sibblingNode;
-        // Remove it from the old position
+        // Remove it from its old position
         nodesRegisterByTreeLevel[sibblingNode.level].splice(
             nodesRegisterByTreeLevel[sibblingNode.level].findIndex(n => n === sibblingNode),
             1
@@ -153,22 +204,55 @@ function killNodeAndTransferParentDataToRemainingChildAndHydrateDescendantLevels
         // Now Killing theParentNode Since we tranfer its data and its antecedants
         theParentNode = null;
         // Hydration of the children of the updated sibblingNode to refresh their new levels
-        var decrementLevelNodeTransformer = function (node){
-            node.level = Math.max(0, node.level - 1);
-        };
         updateDescendantNodesUsingBfs(sibblingNode, decrementLevelNodeTransformer);
         return 1;
     }
     return 0;
 };
 
-function extendLastNodeWithNewSibbling(node, infoNewSibbling) {
+function extendLastNodeAndNewSibbling(node, infoNewSibbling) {
     if(node.subNodeLeft === null && node.subNodeRight === null){
+        // We Transfer Its data to his subNodeLeft
         node.subNodeLeft = new Node(node.info);
-        node.info = node.parentNode.info;
-        node.subNodeRight = new Node(infoNewSibbling);
         node.subNodeLeft.level = node.level + 1;
+        // We Create the new Node with the new Info
+        node.subNodeRight = new Node(infoNewSibbling);
         node.subNodeRight.level = node.level + 1;
+        // We Set Idle the info of original node since we transfer its info
+        node.info = getInitialNodeInfo();
+
+        // Now Updating the nodesRegisterByTreeLevel
+        // First Step : Searching if there is already a node in the upper level:
+        var nodesRegisterLevelOfNewNodes = nodesRegisterByTreeLevel[node.level + 1];
+        if(nodesRegisterLevelOfNewNodes){
+            var nodesRegisterUpperLevel = nodesRegisterByTreeLevel[node.level];
+            // Getting the index of original Node in the registry
+            var indexOfOriginalNode = nodesRegisterUpperLevel.findIndex(
+                n => n === node
+            );
+            var stepperNewLevelRegistry = nodesRegisterLevelOfNewNodes.length - 1;
+            while(stepperNewLevelRegistry >= 0) {
+                var node = nodesRegisterLevelOfNewNodes[stepperNewLevelRegistry];
+                 // Getting the index of Parent Node in the registry
+                var indexOfParentNodeInRegister = nodesRegisterUpperLevel.findIndex(
+                    n => n === node.parentNode
+                );
+                // Compare its position with the index of original Node
+                // To know the correct position of new nodes in the register 
+                if(indexOfOriginalNode > indexOfParentNodeInRegister){
+                    break;
+                }
+                stepperNewLevelRegistry = stepperNewLevelRegistry - 2;
+            }
+            nodesRegisterLevelOfNewNodes.splice(
+                stepperNewLevelRegistry,
+                0,
+                node.subNodeLeft,
+                node.subNodeRight
+            );
+        }else{
+            nodesRegisterByTreeLevel[node.level + 1] = [node.subNodeLeft, node.subNodeRight];
+        }
         return 1;
     }
     return 0;
