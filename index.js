@@ -12,28 +12,40 @@ function generateRandomIntTo(max) {
     return parseInt((Math.random() * 1000000).toFixed()) % max;
 };
 
-/**      The Process of handling the binary Tree       **/
+/**      The Process of handling Nodes       **/
 
-// Global Variables :
-var inMemoryNodesInSameLevel = [];
-var lastNodesNumber = 1;
-var totalActiveNodes = 0;
-var nodesRegisterByTreeLevel = {};
-var levelVariable = 0;
-var index = 0;
-function getInitialNodeInfo() {
-    return {
-        "state": "idle"
+function NodeRegistry(){
+    this.map = {};
+    this.insertNode = (node) => {
+        if(this.map[node.level]){
+            this.map[node.level][node.position] = node;
+        }else{
+            this.map[node.level] = [node];
+        }
     };
-};
+    this.insertNodes = (...args) => {
+        args.forEach(node => {
+            this.insertNode(node);
+        });
+    };
+    this.removeNode = (node) => {
+        if(this.map[node.level]){
+            this.map[node.level].splice(
+                node.position,
+                1
+            );
+        }
+    };
+}
 
-// MODEL OF A NODE
+// MODEL OF A Binary NODE
 function Node(info) {
     this.info = info;
     this.subNodeLeft = null;
     this.subNodeRight = null;
     this.parentNode = null;
     this.level = 0;
+    this.position = 0;
     this.toString = function toString() {
         if (this.info.player === undefined) {
             return "Node-x";
@@ -58,254 +70,131 @@ function Node(info) {
  *      3 - Override the getInitialNodeInfo
  *      4 - Call constructBinaryTree()
  */
-function constructBinaryTree() {
-    if (lastNodesNumber < totalActiveNodes) {
-        var allChilds = [];
-        for (var k = 0; k < inMemoryNodesInSameLevel.length; k++) {
-            lastNodesNumber++;
-            var nodeLeft = new Node(getInitialNodeInfo());
-            var nodeRight = new Node(getInitialNodeInfo());
-            index += 2;
-            if (levelVariable === 0) {
-                nodeLeft.level = 1;
-                nodeRight.level = 1;
-                nodesRegisterByTreeLevel[1] = [nodeLeft, nodeRight];
-                levelVariable++;
-            } else if (levelVariable >= 1) {
-                var newLevel = Math.log2(inMemoryNodesInSameLevel.length) + 1;
-                nodeLeft.level = newLevel;
-                nodeRight.level = newLevel;
-                if (nodesRegisterByTreeLevel[newLevel] === undefined) {
-                    nodesRegisterByTreeLevel[newLevel] = [nodeLeft, nodeRight];
-                } else {
-                    nodesRegisterByTreeLevel[newLevel].push(nodeLeft, nodeRight);
-                }
-            }
-            inMemoryNodesInSameLevel[k].subNodeLeft = nodeLeft;
-            inMemoryNodesInSameLevel[k].subNodeRight = nodeRight;
-            nodeLeft.parentNode = inMemoryNodesInSameLevel[k];
-            nodeRight.parentNode = inMemoryNodesInSameLevel[k];
 
-            allChilds.push(nodeLeft);
-            allChilds.push(nodeRight);
-        }
-        inMemoryNodesInSameLevel = allChilds;
-        constructBinaryTree();
+/**
+ * 
+ * @param {the node that we'll transform all its descendants} node 
+ * @param {it's a function that receive a node and update the node} nodeTransformer 
+ * 
+ * note : The Rule in nodeTransformer : Don't modify any descendant node except the node in argument of nodeTransformer
+ */
+function updateDescendantNodesUsingDfs(node, nodeTransformer) {
+    if(node !== null && node.subNodeLeft !== null){
+        nodeTransformer(node.subNodeLeft);
+        updateDescendantNodesUsingDfs(node.subNodeLeft, nodeTransformer);
+    }
+    if(node !== null && node.subNodeRight !== null){
+        nodeTransformer(node.subNodeRight);
+        updateDescendantNodesUsingDfs(node.subNodeRight, nodeTransformer);
     }
 };
 
 /**
  * 
  * @param {the node that we'll transform all its descendants} node 
- * @param {it's a function that receive a node and return the updated node} nodeTransformer 
+ * @param {it's a function that receive a node and update the node} nodeTransformer 
  * 
  * note : The Rule in nodeTransformer : Don't modify any descendant node except the node in argument of nodeTransformer
  */
-function updateDescendantNodesUsingBfs(node, nodeTransformer) {
-    if(node !== null && node.subNodeLeft !== null){
-        nodeTransformer(node.subNodeLeft);
-        updateDescendantNodesUsingBfs(node.subNodeLeft, nodeTransformer);
-    }
-    if(node !== null && node.subNodeRight !== null){
-        nodeTransformer(node.subNodeRight);
-        updateDescendantNodesUsingBfs(node.subNodeRight, nodeTransformer);
-    }
-};
-
-// Node Transformers
-
-//  Decrement the level of a node and handle its position in tree registry
-function decrementLevelNodeTransformer(node){
-    var parent = node.parentNode;
-    if(parent){
-        var isLeftNode = (parent.subNodeLeft === node);
-        // Getting his sibblingNode
-        var sibblingNode = (
-            isLeftNode
-            ?   parent.subNodeRight
-            :   parent.subNodeLeft
-        );
-        // Get Current Level Node In Registry Tree
-        var currentRegistryLevel = nodesRegisterByTreeLevel[node.level];
-        var upRegistryLevel = nodesRegisterByTreeLevel[node.level - 1];
-        // Checking If its Sibbling is already in the up registry
-        var indexOfSibblingInUpRegistry = upRegistryLevel.find(n => n === sibblingNode);
-        if(Boolean(indexOfSibblingInUpRegistry)){
-            // Means that node has already alocated space
-            if(isLeftNode) {
-                upRegistryLevel[indexOfSibblingInUpRegistry - 1] = node;
-            }
-            else {
-                upRegistryLevel[indexOfSibblingInUpRegistry + 1] = node;
-            }
-        } else {
-            // Alocating space for sibblingNode and placing the node in the up registry
-            // It's a binary tree we'll have always 2 nodes to add then we'll alocate a table of 2 nodes
-            // We divise by 2 because in binary tree we can predict the up level number of nodes
-            var newIndexInUpRegistry = Math.round(currentRegistryLevel.findIndex(n => n === node) / 2);
-            if(isLeftNode) {
-                upRegistryLevel.splice(
-                    newIndexInUpRegistry,
-                    0,
-                    node,
-                    null
-                );
-            } else {
-                upRegistryLevel.splice(
-                    newIndexInUpRegistry,
-                    0,
-                    null,
-                    node
-                );
-            }
-        }
-    }
-    node.level = Math.max(0, node.level - 1);
-};
-
-function killNodeAndTransferParentDataToRemainingChildAndHydrateDescendantLevels(node) {
-    var theParentNode = node.parentNode
-    if(theParentNode){
-        var sibblingNode = (
-            (theParentNode.subNodeLeft === node)
-            ? theParentNode.subNodeRight
-            : theParentNode.subNodeLeft
-        );
-        // remove the node from nodesRegisterByTreeLevel and kill it
-        nodesRegisterByTreeLevel[node.level].splice(
-            nodesRegisterByTreeLevel[node.level].findIndex(n => n === node),
-            1
-        );
-        node = null;
-        // Transfer Parent Data to sibblingNode
-        sibblingNode.info = theParentNode.info;
-        // Link Parent of theParentNode with sibblingNode if exist
-        if(theParentNode.parentNode) {
-            // Update the parent of parentNode by updating its children
-            if(theParentNode.parentNode.subNodeLeft === theParentNode) {
-                theParentNode.parentNode.subNodeLeft = sibblingNode;
-            } else {
-                theParentNode.parentNode.subNodeRight = sibblingNode;
-            }
-        }
-        // Update the sibblingNode by adding new Parent
-        sibblingNode.parentNode = theParentNode.parentNode;
-        // Updating the sibblingNode position in the nodesRegisterByTreeLevel
-        var positionOfParentInRegistry = nodesRegisterByTreeLevel[theParentNode.level].findIndex(n => n === theParentNode);
-        // Place it in the position
-        nodesRegisterByTreeLevel[theParentNode.level][positionOfParentInRegistry] = sibblingNode;
-        // Remove it from its old position
-        nodesRegisterByTreeLevel[sibblingNode.level].splice(
-            nodesRegisterByTreeLevel[sibblingNode.level].findIndex(n => n === sibblingNode),
-            1
-        );
-        // Refresh his new level
-        sibblingNode.level = theParentNode.level;
-        // Now Killing theParentNode Since we tranfer its data and its antecedants
-        theParentNode = null;
-        // Hydration of the children of the updated sibblingNode to refresh their new levels
-        updateDescendantNodesUsingBfs(sibblingNode, decrementLevelNodeTransformer);
-        return 1;
-    }
-    return 0;
-};
-
-function extendLastNodeAndNewSibbling(node, infoNewSibbling) {
-    if(node.subNodeLeft === null && node.subNodeRight === null){
-        // We Transfer Its data to his subNodeLeft
-        node.subNodeLeft = new Node(node.info);
-        node.subNodeLeft.level = node.level + 1;
-        // We Create the new Node with the new Info
-        node.subNodeRight = new Node(infoNewSibbling);
-        node.subNodeRight.level = node.level + 1;
-        // We Set Idle the info of original node since we transfer its info
-        node.info = getInitialNodeInfo();
-
-        // Now Updating the nodesRegisterByTreeLevel
-        // First Step : Searching if there is already a node in the upper level:
-        var nodesRegisterLevelOfNewNodes = nodesRegisterByTreeLevel[node.level + 1];
-        if(nodesRegisterLevelOfNewNodes){
-            var nodesRegisterUpperLevel = nodesRegisterByTreeLevel[node.level];
-            // Getting the index of original Node in the registry
-            var indexOfOriginalNode = nodesRegisterUpperLevel.findIndex(
-                n => n === node
-            );
-            var stepperNewLevelRegistry = nodesRegisterLevelOfNewNodes.length - 1;
-            while(stepperNewLevelRegistry >= 0) {
-                var node = nodesRegisterLevelOfNewNodes[stepperNewLevelRegistry];
-                 // Getting the index of Parent Node in the registry
-                var indexOfParentNodeInRegister = nodesRegisterUpperLevel.findIndex(
-                    n => n === node.parentNode
-                );
-                // Compare its position with the index of original Node
-                // To know the correct position of new nodes in the register 
-                if(indexOfOriginalNode > indexOfParentNodeInRegister){
-                    break;
+function recursiveBfs(inMemoryNodesBfs, nextMemoryNodesBfs, nodeTransformer) {
+    if(inMemoryNodesBfs.length > 0){
+        console.log("Reading from inMemoryNodes", inMemoryNodesBfs);
+        inMemoryNodesBfs.forEach(
+            node => {
+                if(nodeTransformer(node) === -1){
+                    return;
                 }
-                stepperNewLevelRegistry = stepperNewLevelRegistry - 2;
+                if(node.subNodeLeft !== null){
+                    nextMemoryNodesBfs.push(node.subNodeLeft);
+                }
+                if(node.subNodeRight !== null){
+                    nextMemoryNodesBfs.push(node.subNodeRight);
+                }                
             }
-            nodesRegisterLevelOfNewNodes.splice(
-                stepperNewLevelRegistry,
-                0,
-                node.subNodeLeft,
-                node.subNodeRight
-            );
-        }else{
-            nodesRegisterByTreeLevel[node.level + 1] = [node.subNodeLeft, node.subNodeRight];
-        }
-        return 1;
+        );
+        console.log("Constructing the nextMemoryNodesBfs", nextMemoryNodesBfs);
+        recursiveBfs(nextMemoryNodesBfs, [], nodeTransformer);
     }
-    return 0;
+    console.log("We Stop the recursive calls");
 };
 
-/**  End of the management of tree  **/
+function updateDescendantNodesUsingBfs(node, nodeTransformer) {
+    var inMemoryNodesBfs = [];
+    if(node.subNodeLeft !== null){
+        inMemoryNodesBfs.push(node.subNodeLeft);
+    }
+    if(node.subNodeRight !== null){
+        inMemoryNodesBfs.push(node.subNodeRight);
+    }
+    recursiveBfs(inMemoryNodesBfs, [], nodeTransformer);
+};
 
-// Preparing the 
+function generateChildrenNode(node, getIdleNodeInfo) {
+    var leftNode = new Node(getIdleNodeInfo());
+    leftNode.level = node.level + 1;
+    leftNode.parentNode = node;
+    var rightNode = new Node(getIdleNodeInfo());
+    rightNode.level = node.level + 1;
+    rightNode.parentNode = node;
+    node.subNodeLeft = leftNode;
+    node.subNodeRight = rightNode;
+}
 
-var Players = [];
-var nodesRegisterByPlayer = {};
+function createDescendantNodesUsingBfs(principalNode, dept, getIdleNodeInfo) {
+    if(dept === 0){return;}
+    var nodeRegistry = new NodeRegistry();
+    generateChildrenNode(principalNode, getIdleNodeInfo);
+    principalNode.subNodeLeft.position = 0;
+    principalNode.subNodeRight.position = 1;
+    var nodePosition = 0;
+    var flagLevel = 1;
+    nodeRegistry.insertNodes(principalNode, principalNode.subNodeLeft, principalNode.subNodeRight);
+    recursiveBfs([principalNode.subNodeLeft, principalNode.subNodeRight], [], (node) => {
+        if(node.level === dept){return -1;}
+        generateChildrenNode(node, getIdleNodeInfo);
+        if(node.level !== flagLevel){
+            nodePosition = 0;
+            flagLevel = node.level;
+        }
+        node.subNodeLeft.position = nodePosition;
+        node.subNodeRight.position = ++nodePosition;
+        nodePosition++;
+        nodeRegistry.insertNodes(node.subNodeLeft, node.subNodeRight);
+        return 0;
+    });
+    return nodeRegistry;
+};
+
 
 // MODEL OF PLAYER
 function Player(name) {
     this.name = name;
 };
 
-/** return {  }
- * 
- * note : 
- */
-function getIdleInfoPlayer() {
-    return {
-        "player": new Player("x"),
-        "state": "idle",
-    };
-};
-
 function generateRandomelyPlayersList(array) {
-    totalActiveNodes = array.length;
     const listOfRandomes = [];
     const newArray = [];
     var i = 0;
-    while (i < totalActiveNodes) {
-        var random = generateRandomIntTo(totalActiveNodes);
+    while (i < array.length) {
+        var random = generateRandomIntTo(array.length);
         if (!listOfRandomes.includes(random)) {
             newArray[random] = array[i];
             listOfRandomes.push(random);
             i++;
         };
     };
-    Players = newArray;
+    return newArray;
 };
 
 // The Tournament Board System that will implements the binary TREE
 
 function TournamentBoard(players) {
-    this.players = players;
+    this.players = generateRandomelyPlayersList(players);
     this.numberOfMutations = 0;
     this.previousTree = null;
     this.tree = null;
     this.nodesRegisterByTreeLevel = null;
-    this.nodesRegisterByPlayer = null;
+    this.nodesRegisterByPlayer = {};
     this.data = {
         "errors": []
     };
@@ -340,124 +229,42 @@ function TournamentBoard(players) {
             "player": new Player("x"),
             "state": "winner"
         });
-        // Start the creation of the tree
-        inMemoryNodesInSameLevel.push(this.tree);
-        nodesRegisterByTreeLevel[0] = [this.tree];
-        getInitialNodeInfo = getIdleInfoPlayer;
-        constructBinaryTree();
-        // End the creation of the tree
-        this.nodesRegisterByTreeLevel = nodesRegisterByTreeLevel;
+        var dept = Math.ceil(Math.log2(this.players.length));
+        var newRegister = createDescendantNodesUsingBfs(this.tree, dept, () => ({
+            "player": new Player("x"),
+            "state": "idle",
+        }));
+        this.nodesRegisterByTreeLevel = newRegister.map;
+        var nodesInTreeBottom = newRegister.map[dept];
         var emptyPlayerNodes = [];
-        // Now inMemoryNodesInSameLevel will presents the nodes in the final Level of tree ( the depth of tree )
-        for (var k = 0; k < inMemoryNodesInSameLevel.length; k++) {
+        for (var k = 0; k < nodesInTreeBottom.length; k++) {
             if (this.players[k] === undefined) {
-                inMemoryNodesInSameLevel[k].info.player.name = "NaN";
-                inMemoryNodesInSameLevel[k].info.state = "looser";
-                emptyPlayerNodes.push(inMemoryNodesInSameLevel[k]);
+                nodesInTreeBottom[k].info.player.name = "NaN";
+                nodesInTreeBottom[k].info.state = "looser";
+                emptyPlayerNodes.push(nodesInTreeBottom[k]);
             } else {
-                inMemoryNodesInSameLevel[k].info.player.name = this.players[k];
-                nodesRegisterByPlayer[this.players[k]] = inMemoryNodesInSameLevel[k];
+                nodesInTreeBottom[k].info.player.name = this.players[k];
+                this.nodesRegisterByPlayer[this.players[k]] = nodesInTreeBottom[k];
             }
         };
-        console.group("Hydration of the tree");
-        console.log("Managing players with no oponenents and empty cases");
-        console.log("the List of players are :", this.players);
-        console.log("the empty player nodes are :", emptyPlayerNodes);
-        console.log("Inside the inMemoryNodesInSameLevel ", inMemoryNodesInSameLevel);
-        // The Dept of correcting exceptions is just handling non presence of 4 players in the tree (it's working for a board of 8 players and below)
-        console.log("Number of empty players is ", emptyPlayerNodes.length);
-        
-        var inMemoryPlayers = this.players;
-        var neighborsEmptyPlayers = [];
-        if(emptyPlayerNodes.length > 0){
-            // Getting the neighbors players that will have to change their positions :
-            var stepperNeighbors = emptyPlayerNodes.length;
-            while(is_StrictlyFloat(Math.log2(stepperNeighbors)) || neighborsEmptyPlayers.length === 0){
-                neighborsEmptyPlayers.push(inMemoryPlayers.pop());
-                stepperNeighbors++;
-            }
-            console.log("This is the neighbors : ", neighborsEmptyPlayers);
-        }
-
-        // We Clear the Unused Vars
-        inMemoryPlayers = undefined;
-        
-        // for (var j = emptyLooserNodes.length - 1; j > -1; j--) {
-        //     var node = emptyLooserNodes[j];
-        //     var parent = node.parentNode;
-        //     if (parent && parent.subNodeLeft !== node) {
-        //         if (parent.subNodeLeft.info.player.name === "") {
-        //             parent.info.player.name = "N/A";
-        //             parent.info.state = "looser";
-        //         } else {
-        //             parent.info.player.name = parent.subNodeLeft.info.player.name;
-        //             parent.info.state = "idle";
-        //             parent.subNodeLeft.info.player.name = "";
-        //             parent.subNodeLeft.info.state = "looser";
-        //             var parentOfParent = parent.parentNode;
-        //             if (
-        //                 parentOfParent
-        //                 && (
-        //                     (parentOfParent.subNodeLeft
-        //                         && parentOfParent.subNodeLeft.info.player.name === "N/A")
-        //                     || (parentOfParent.subNodeRight
-        //                         && parentOfParent.subNodeRight.info.player.name === "N/A")
-        //                 )
-        //             ) {
-        //                 parentOfParent.info.player.name = parent.info.player.name;
-        //                 parentOfParent.info.state = "idle";
-        //                 parent.info.state = "looser";
-        //                 parent.info.player.name = "N/A";
-        //                 nodesRegisterByPlayer[parentOfParent.info.player.name] = parentOfParent;
-        //             } else {
-        //                 nodesRegisterByPlayer[parent.info.player.name] = parent;
-        //             }
-        //         }
-        //     } else if (parent && parent.subNodeRight !== node) {
-        //         if (parent.subNodeRight.info.player.name === "") {
-        //             parent.info.player.name = "N/A";
-        //             parent.info.state = "looser";
-        //         } else {
-        //             parent.info.player.name = parent.subNodeRight.info.player.name;
-        //             parent.info.state = "idle";
-        //             parent.subNodeRight.info.player.name = "";
-        //             parent.subNodeRight.info.state = "looser";
-        //             var parentOfParent = parent.parentNode;
-        //             if (
-        //                 parentOfParent
-        //                 && (
-        //                     (parentOfParent.subNodeLeft
-        //                         && parentOfParent.subNodeLeft.info.player.name === "N/A")
-        //                     || (parentOfParent.subNodeRight
-        //                         && parentOfParent.subNodeRight.info.player.name === "N/A")
-        //                 )
-        //             ) {
-        //                 parentOfParent.info.player.name = parent.info.player.name;
-        //                 parentOfParent.info.state = "idle";
-        //                 parent.info.state = "looser";
-        //                 parent.info.player.name = "N/A";
-        //                 nodesRegisterByPlayer[parentOfParent.info.player.name] = parentOfParent;
-        //             } else {
-        //                 nodesRegisterByPlayer[parent.info.player.name] = parent;
-        //             }
-        //         }
+        // console.group("Hydration of the tree");
+        // console.log("Managing players with no oponenents and empty cases");
+        // console.log("the List of players are :", this.players);
+        // console.log("the empty player nodes are :", emptyPlayerNodes);
+        // // The Dept of correcting exceptions is just handling non presence of 4 players in the tree (it's working for a board of 8 players and below)
+        // console.log("Number of empty players is ", emptyPlayerNodes.length);
+        // var neighborsEmptyPlayers = [];
+        // if(emptyPlayerNodes.length > 0){
+        //     // Getting the neighbors players that will have to change their positions :
+        //     var stepperNeighbors = emptyPlayerNodes.length;
+        //     while(is_StrictlyFloat(Math.log2(stepperNeighbors)) || neighborsEmptyPlayers.length === 0){
+        //         neighborsEmptyPlayers.push(nodesInTreeBottom.pop());
+        //         stepperNeighbors++;
         //     }
+        //     console.log("This is the neighbors : ", neighborsEmptyPlayers);
         // }
-        console.groupEnd();
-        this.nodesRegisterByPlayer = nodesRegisterByPlayer;
+        // console.groupEnd();
     };
-};
-
-
-// The Function that clear memory by resetting global variables
-function flushData() {
-    lastNodesNumber = 1;
-    index = 0;
-    inMemoryNodesInSameLevel = [];
-    levelVariable = 0;
-    nodesRegisterByPlayer = {};
-    nodesRegisterByTreeLevel = [];
-    Players = [];
 };
 
 
@@ -621,24 +428,20 @@ export default function Main(
 ) {
     console.group("Tournament Generator Core Result");
     // Must Handle Errors of List ( Number of Players , No duplicate Players ...) , Must give a register of error names
-    generateRandomelyPlayersList(
-        namesOfPlayers
-    );
-    var tournament = new TournamentBoard(Players);
+    var tournament = new TournamentBoard(namesOfPlayers);
     // Data PROCESS
     // If Else for other errors :
     // INSUFISANT_PLAYERS
     // DUPLICATED_PLAYERS
     // TOO MUCH PLAYERS
 
-    if(Players.length <= 1){
+    if(namesOfPlayers.length <= 1){
         tournament.data.errors.push({
             "code": "INSUFISANT_PLAYERS",
             "msg": "The generation of the tournament requires at least two players"
         });
     } else {
         tournament.construct();
-        flushData();
         console.log("tree :", tournament.tree);
         console.log("players :", tournament.players);
         console.log("nodesRegisterByPlayer :", tournament.nodesRegisterByPlayer);
