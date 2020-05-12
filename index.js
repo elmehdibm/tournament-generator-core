@@ -16,25 +16,69 @@ function generateRandomIntTo(max) {
 
 function NodeRegistry(){
     this.map = {};
-    this.insertNode = (node) => {
+    this.getDept = () => {
+        return Object.values(this.map).length;
+    };
+    this.putNode = (node) => {
         if(this.map[node.level]){
             this.map[node.level][node.position] = node;
         }else{
             this.map[node.level] = [node];
         }
     };
-    this.insertNodes = (...args) => {
+    this.getNodesInLevel = (level) => {
+        if(level >= this.getDept()){
+            return null;
+        }
+        return Array.from(this.map[level].map(n => ({
+            ...n
+        })));
+    };
+    this.getNode = (level, position) => {
+        return this.map[level].find(n => n.position === position);
+    };
+    this.getNodeCopy = (level, position) => {
+        return this.getNodesInLevel(level)[position];
+    };
+    this.putNodes = (...args) => {
         args.forEach(node => {
-            this.insertNode(node);
+            this.putNode(node);
         });
     };
-    this.removeNode = (node) => {
-        if(this.map[node.level]){
-            this.map[node.level].splice(
-                node.position,
-                1
-            );
+    this.removeNodes = (...args) => {
+        console.log("the nodes to kill are", args);
+        var level = args[0].level;
+        if(args.length > 0 && this.map[level]){
+        this.map[level].splice(
+            args[0].position,
+            args.length
+        );
+        (this.getNodesInLevel(level)).slice(args[0].position).forEach((n) => {
+            this.getNode(level, n.position).position--;
+        });
         }
+    };
+    this.insertNode = (node, pos) => {
+        this.insertNodes([node], node.level, pos);
+    };
+    this.insertNodes = (nodes, level, pos) => {
+        if(this.map[level]){
+            this.map[level].splice(
+                pos,
+                0,
+                ...nodes
+            );
+            (this.getNodesInLevel(level)).slice(pos).forEach((n, index) => {
+                this.getNode(level, n.position).level = level;
+                this.getNode(level, n.position).position = pos + index;
+            });
+        }
+    };
+    this.insertNodesInLast = (nodes, level) => {
+        if(!this.map[level]){
+            this.map[level] = [];
+        }
+        this.insertNodes(nodes, level, this.map[level].length);
     };
 }
 
@@ -53,23 +97,6 @@ function Node(info) {
         return "Node-" + this.info.player.name;
     }
 };
-
-/**
- * 
- * Construction of the binary tree where each node
- *      can have 2 children node or none
- * 
- * note 1 : It's not a pure function ( it uses global variables )
- * note 2 : It's a recursive function each call we manage one level and we repeat
- * note 3 : It constructs nodes level by level and keep in memory nodes on each level in the variable 'inMemoryNodesInSameLevel'
- * note 4 : It initially gives all nodes an idle information by 'getInitialNodeInfo'
- * 
- * ╟╟╟ Instructions to Implement it to other systems ╟╟╟
- *      1 - Create the principal node that represents all the tree ( it's the source node in the tree )
- *      2 - Add the principal node in inMemoryNodesInSameLevel and in nodesRegisterByTreeLevel
- *      3 - Override the getInitialNodeInfo
- *      4 - Call constructBinaryTree()
- */
 
 /**
  * 
@@ -96,26 +123,40 @@ function updateDescendantNodesUsingDfs(node, nodeTransformer) {
  * 
  * note : The Rule in nodeTransformer : Don't modify any descendant node except the node in argument of nodeTransformer
  */
-function recursiveBfs(inMemoryNodesBfs, nextMemoryNodesBfs, nodeTransformer) {
+function recursiveBfs(inMemoryNodesBfs, nextMemoryNodesBfs, nodeTransformer, bulknodeTransformer) {
     if(inMemoryNodesBfs.length > 0){
-        console.log("Reading from inMemoryNodes", inMemoryNodesBfs);
+        if(bulknodeTransformer){
+            const value = bulknodeTransformer(inMemoryNodesBfs);
+            if(value === -1){
+                return;
+            }
+        };
         inMemoryNodesBfs.forEach(
             node => {
                 if(nodeTransformer(node) === -1){
                     return;
-                }
+                };
                 if(node.subNodeLeft !== null){
                     nextMemoryNodesBfs.push(node.subNodeLeft);
                 }
                 if(node.subNodeRight !== null){
                     nextMemoryNodesBfs.push(node.subNodeRight);
-                }                
+                }               
             }
         );
-        console.log("Constructing the nextMemoryNodesBfs", nextMemoryNodesBfs);
-        recursiveBfs(nextMemoryNodesBfs, [], nodeTransformer);
+        recursiveBfs(nextMemoryNodesBfs, [], nodeTransformer, bulknodeTransformer);
     }
-    console.log("We Stop the recursive calls");
+};
+
+function updateDescendantNodesUsingBfsBulkMode(node, bulknodeTransformer) {
+    var inMemoryNodesBfs = [];
+    if(node.subNodeLeft !== null){
+        inMemoryNodesBfs.push(node.subNodeLeft);
+    }
+    if(node.subNodeRight !== null){
+        inMemoryNodesBfs.push(node.subNodeRight);
+    }
+    recursiveBfs(inMemoryNodesBfs, [], _ => 0, bulknodeTransformer);
 };
 
 function updateDescendantNodesUsingBfs(node, nodeTransformer) {
@@ -139,7 +180,18 @@ function generateChildrenNode(node, getIdleNodeInfo) {
     node.subNodeLeft = leftNode;
     node.subNodeRight = rightNode;
 }
-
+/**
+ * 
+ * Construction of the binary tree where each node
+ *      can have 2 children node or none
+ * 
+ *  @param {} principalNode 
+ *  @param {} dept 
+ *  @param {} getIdleNodeInfo 
+ * 
+ * note : It's a recursive function each call we manage one level and we repeat
+ * 
+ */
 function createDescendantNodesUsingBfs(principalNode, dept, getIdleNodeInfo) {
     if(dept === 0){return;}
     var nodeRegistry = new NodeRegistry();
@@ -148,7 +200,7 @@ function createDescendantNodesUsingBfs(principalNode, dept, getIdleNodeInfo) {
     principalNode.subNodeRight.position = 1;
     var nodePosition = 0;
     var flagLevel = 1;
-    nodeRegistry.insertNodes(principalNode, principalNode.subNodeLeft, principalNode.subNodeRight);
+    nodeRegistry.putNodes(principalNode, principalNode.subNodeLeft, principalNode.subNodeRight);
     recursiveBfs([principalNode.subNodeLeft, principalNode.subNodeRight], [], (node) => {
         if(node.level === dept){return -1;}
         generateChildrenNode(node, getIdleNodeInfo);
@@ -159,12 +211,42 @@ function createDescendantNodesUsingBfs(principalNode, dept, getIdleNodeInfo) {
         node.subNodeLeft.position = nodePosition;
         node.subNodeRight.position = ++nodePosition;
         nodePosition++;
-        nodeRegistry.insertNodes(node.subNodeLeft, node.subNodeRight);
+        nodeRegistry.putNodes(node.subNodeLeft, node.subNodeRight);
         return 0;
     });
     return nodeRegistry;
 };
 
+function findNearestRelatedParent(...nodes){
+    if(nodes.length === 0){return -1};
+    var initialNode = nodes[0];
+    var isTrueParent = true;
+    nodes.forEach(node => {
+        if(!node.parentNode || !initialNode.parentNode){
+            return -1;
+        }
+        if(node.parentNode !== initialNode.parentNode){
+            isTrueParent = false;
+        }
+    });
+    if(isTrueParent){
+        return initialNode.parentNode;
+    }
+    return findNearestRelatedParent(...(Array.from(new Set(nodes.map(n => n.parentNode)))));
+};
+
+function getSibbling(node){
+    if(node.parentNode){
+        return (node.parentNode.subNodeLeft === node) ? node.parentNode.subNodeRight : node.parentNode.subNodeLeft;
+    }
+    return null;
+};
+
+function exchangeInfoBetweenTwoNodes(node1 , node2){
+    var info = node1.info;
+    node1.info = node2.info;
+    node2.info = info;
+};
 
 // MODEL OF PLAYER
 function Player(name) {
@@ -235,38 +317,92 @@ function TournamentBoard(players) {
             "state": "idle",
         }));
         this.nodesRegisterByTreeLevel = newRegister.map;
-        var nodesInTreeBottom = newRegister.map[dept];
+        var lastNodes = Array.from(newRegister.map[dept]);
+        var lastActiveNodes = [];
         var emptyPlayerNodes = [];
-        for (var k = 0; k < nodesInTreeBottom.length; k++) {
+        for (var k = 0; k < lastNodes.length; k++) {
             if (this.players[k] === undefined) {
-                nodesInTreeBottom[k].info.player.name = "NaN";
-                nodesInTreeBottom[k].info.state = "looser";
-                emptyPlayerNodes.push(nodesInTreeBottom[k]);
+                lastNodes[k].info.player.name = "NaN";
+                lastNodes[k].info.state = "looser";
+                emptyPlayerNodes.push(lastNodes[k]);
             } else {
-                nodesInTreeBottom[k].info.player.name = this.players[k];
-                this.nodesRegisterByPlayer[this.players[k]] = nodesInTreeBottom[k];
+                lastActiveNodes.push(lastNodes[k]);
+                lastNodes[k].info.player.name = this.players[k];
+                this.nodesRegisterByPlayer[this.players[k]] = lastNodes[k];
             }
         };
-        // console.group("Hydration of the tree");
-        // console.log("Managing players with no oponenents and empty cases");
-        // console.log("the List of players are :", this.players);
-        // console.log("the empty player nodes are :", emptyPlayerNodes);
-        // // The Dept of correcting exceptions is just handling non presence of 4 players in the tree (it's working for a board of 8 players and below)
-        // console.log("Number of empty players is ", emptyPlayerNodes.length);
-        // var neighborsEmptyPlayers = [];
-        // if(emptyPlayerNodes.length > 0){
-        //     // Getting the neighbors players that will have to change their positions :
-        //     var stepperNeighbors = emptyPlayerNodes.length;
-        //     while(is_StrictlyFloat(Math.log2(stepperNeighbors)) || neighborsEmptyPlayers.length === 0){
-        //         neighborsEmptyPlayers.push(nodesInTreeBottom.pop());
-        //         stepperNeighbors++;
-        //     }
-        //     console.log("This is the neighbors : ", neighborsEmptyPlayers);
-        // }
-        // console.groupEnd();
+        console.group("Hydration of the tree");
+        console.log("Managing players with no oponenents and empty cases");
+        // Getting the neighbors players that will have to change their positions :
+        var neighborsEmptyPlayers = [];
+        if(emptyPlayerNodes.length > 0){
+            var stepperNeighbors = emptyPlayerNodes.length;
+            while(is_StrictlyFloat(Math.log2(stepperNeighbors)) || neighborsEmptyPlayers.length === 0){
+                neighborsEmptyPlayers.push(lastActiveNodes.pop());
+                stepperNeighbors++;
+            }
+        }
+        if(neighborsEmptyPlayers.length > 0){
+            var nearestParent = findNearestRelatedParent(...[
+                ...neighborsEmptyPlayers,
+                ...emptyPlayerNodes
+            ]);
+            // Process Of Killing nodes and replacing positions
+            updateDescendantNodesUsingDfs(nearestParent, (node) => {
+                newRegister.removeNodes(node);
+                node = null;
+            });
+            var sibblingsNearestParent = getSibbling(nearestParent);
+            if(nearestParent.parentNode.subNodeLeft === nearestParent){
+                newRegister.removeNodes(nearestParent, sibblingsNearestParent);
+            }else {
+                newRegister.removeNodes(sibblingsNearestParent, nearestParent);
+            }
+            updateDescendantNodesUsingBfsBulkMode(
+                sibblingsNearestParent,
+                (nodes) => {
+                    console.log("we operate the nodes", nodes);
+                    newRegister.removeNodes(...nodes);
+                    newRegister.insertNodes(
+                        nodes,
+                        nodes[0].level - 1,
+                        nodes[0].position
+                    );
+                }
+            );
+            if(newRegister.getNodesInLevel(newRegister.getDept() - 1).length === 0){
+                delete newRegister.map[newRegister.getDept() - 1];
+            }
+            (sibblingsNearestParent.parentNode).subNodeLeft = sibblingsNearestParent.subNodeLeft;
+            (sibblingsNearestParent.parentNode).subNodeRight = sibblingsNearestParent.subNodeRight;
+            sibblingsNearestParent.subNodeLeft.parentNode = sibblingsNearestParent.parentNode;
+            sibblingsNearestParent.subNodeRight = sibblingsNearestParent.parentNode;
+            nearestParent = null;
+            sibblingsNearestParent = null;
+            console.log("The rest of nodes ", neighborsEmptyPlayers);
+            var nodesToInsert = [];
+            var impactedNodes = lastActiveNodes.slice(lastActiveNodes.length - neighborsEmptyPlayers.length);
+            neighborsEmptyPlayers.forEach((node, index) => {
+                var newNode = new Node({
+                    "player": new Player("x"),
+                    "state": "idle",
+                });
+                exchangeInfoBetweenTwoNodes(newNode, impactedNodes[index]);
+                newNode.level = node.level;
+                newNode.position = node.position + index;
+                newNode.parentNode = impactedNodes[index];
+                node.parentNode = impactedNodes[index];
+                impactedNodes[index].subNodeLeft = newNode;
+                impactedNodes[index].subNodeRight = node;
+                nodesToInsert.push(newNode, node);
+                this.nodesRegisterByPlayer[newNode.info.player.name] = newNode;
+            });
+            newRegister.insertNodesInLast(nodesToInsert, neighborsEmptyPlayers[0].level);
+            // End
+        }
+        console.groupEnd();
     };
 };
-
 
 function Triplet(parentNode, subNode1, subNode2) {
      this.parentNode = parentNode;
@@ -432,8 +568,8 @@ export default function Main(
     // Data PROCESS
     // If Else for other errors :
     // INSUFISANT_PLAYERS
-    // DUPLICATED_PLAYERS
-    // TOO MUCH PLAYERS
+    // DUPLICATED_PLAYERS No 
+    // TOO MUCH PLAYERS You can have it hhh
 
     if(namesOfPlayers.length <= 1){
         tournament.data.errors.push({
@@ -453,6 +589,5 @@ export default function Main(
     console.groupEnd();
     return tournament;
 };
-
 
 // Written By Mehdi BM :)
