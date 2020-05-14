@@ -132,6 +132,8 @@ function updateDescendantNodesUsingDfs(node, nodeTransformer) {
  * note : The Rule in nodeTransformer : Don't modify any descendant node except the node in argument of nodeTransformer
  */
 function recursiveBfs(inMemoryNodesBfs, nextMemoryNodesBfs, nodeTransformer, bulknodeTransformer) {
+    console.log("Begin the recursive call");
+    console.log("the InMemory Data", inMemoryNodesBfs);
     if(inMemoryNodesBfs.length > 0){
         if(bulknodeTransformer){
             const value = bulknodeTransformer(inMemoryNodesBfs);
@@ -256,6 +258,98 @@ function exchangeInfoBetweenTwoNodes(node1 , node2){
     node2.info = info;
 };
 
+function Triplet(parentNode, subNode1, subNode2) {
+    this.parentNode = parentNode;
+    this.subNode1 = subNode1;
+    this.subNode2 = subNode2;   
+};
+
+// Other Helper to navigate Map
+
+function MatrixNavigationByDirection(matrix) {
+   // This Check needs Improvement
+   this.matrix = matrix;
+   this.x = 0;
+   this.y = 0;
+
+   if( !Array.isArray(matrix) || !Array.isArray(matrix[0]) ){
+       throw new Error("It's not a matrix");
+   }
+   this.canMoveUp = function canMoveUp() {
+       if(this.y > 0){
+           return 1;
+       }
+       return 0;
+   };
+   this.up = function moveUp() {
+       if(this.y > 0){
+           this.y--;
+           return 1;
+       }
+       return 0;
+   };
+
+   this.canMoveDown = function canMoveDown() {
+       if(this.y < this.matrix[this.x].length - 1){
+           return 1;
+       }
+       return 0;
+   };
+   this.down = function moveDown() {
+       if(this.y < this.matrix[this.x].length - 1){
+           this.y++;
+           return 1;
+       }
+       return 0;
+   };
+
+   this.canMoveLeft = function canMoveLeft() {
+       if(this.x > 0){
+           return 1;
+       }
+       return 0;
+   }
+   this.left = function moveLeft() {
+       if(this.x > 0){
+           this.x--;
+           if(
+               !this.matrix[this.x][this.y]
+           ){
+               // If there is nothing on the right Case we must parse the Top map until we found a Good Case
+               while(!this.matrix[this.x][this.y]){
+                   this.y--;
+               }
+           }
+           return 1;
+       }
+       return 0;
+   }
+
+   this.canMoveRight = function canMoveRight() {
+       if(this.x < this.matrix.length - 1){
+           return 1;
+       }
+       return 0;
+   }
+   this.right = function moveRight() {
+       if(this.x < this.matrix.length - 1){
+           this.x++;
+           if(
+               !this.matrix[this.x][this.y]
+           ){
+               // If there is nothing on the right Case we must parse the Top map until we found a Good Case
+               while(!this.matrix[this.x][this.y]){
+                   this.y--;
+               }
+           }
+           return 1;
+       }
+       return 0;
+   }
+   this.getElement = function getElement(){
+       return this.matrix[this.x][this.y];
+   }
+};
 // MODEL OF PLAYER
 function Player(name) {
     this.name = name;
@@ -313,7 +407,7 @@ function TournamentBoard(players) {
             }
         }
     };
-    this.construct = function construct() {
+    this.construct = function construct(withScreenNavigation) {
         this.numberOfMutations++;
         this.tree = new Node({
             "player": new Player("x"),
@@ -408,201 +502,41 @@ function TournamentBoard(players) {
             newRegister.insertNodesInLast(nodesToInsert, neighborsEmptyPlayers[0].level);
         }
         console.groupEnd();
-        console.group("Creation of navigation System");
-        var nav2dScreens = [];
-        var arrayT = Object.values(this.nodesRegisterByTreeLevel);
-        for (let i = arrayT.length - 1; i >= 0; i--) {
-            var screens = [];
-            var nodesInLevel = [
-                ...arrayT[i],
-            ];
-            const length = nodesInLevel.length;
-            if(length >= 4) {
-                for(let i = 0; i < length; i = i + 4){
-                    var node1 = nodesInLevel.pop();
-                    var node2 = nodesInLevel.pop();
-                    var node3 = nodesInLevel.pop();
-                    var node4 = nodesInLevel.pop();
+        if(withScreenNavigation){
+            console.group("Creation of navigation System");
+            var nav2dScreens = [];
+            updateDescendantNodesUsingBfsBulkMode(this.tree, (nodes) => {
+                const length = nodes.length;
+                var copyNodes = Array.from(nodes);
+                var screens = [];
+                if(length >= 4) {
+                    for(let i = 0; i < length; i = i + 4){
+                        var node1 = copyNodes.shift();
+                        var node2 = copyNodes.shift();
+                        var node3 = copyNodes.shift();
+                        var node4 = copyNodes.shift();
+                        screens.push({
+                            "triplet1": new Triplet(node1.parentNode, node1, node2),
+                            "triplet2": new Triplet(node3.parentNode, node3, node4)
+                        });
+                    }
+                }
+                if(length > 1 && length % 4 !== 0) {
+                    var node1 = copyNodes.shift();
+                    var node2 = copyNodes.shift();
                     screens.push({
-                        "triplet1": new Triplet(node1.parentNode, node1, node2),
-                        "triplet2": new Triplet(node3.parentNode, node3, node4)
+                        "tripplet": new Triplet(node1.parentNode, node1, node2)
                     });
                 }
-            }
-            if(length > 1 && length % 4 !== 0) {
-                var node1 = nodesInLevel.pop();
-                var node2 = nodesInLevel.pop();
-                screens.push({
-                    "tripplet": new Triplet(node3.parentNode, node3, node4)
-                });
-            }
-            if(screens.length > 0){
-                nav2dScreens.push(screens);
-            }
-        }
-        console.log("The nav2dScreens is ", nav2dScreens);
-        console.groupEnd();
-    };
-};
-
-function Triplet(parentNode, subNode1, subNode2) {
-     this.parentNode = parentNode;
-     this.subNode1 = subNode1;
-     this.subNode2 = subNode2;   
-};
-
-function MatrixNavigationByDirection(matrix) {
-    // This Check needs Improvement
-    if( !Array.isArray(matrix) || !Array.isArray(matrix[0]) ){
-        throw new Error("It's not a matrix");
-    }
-    this.canMoveUp = function canMoveUp() {
-        if(this.y > 0){
-            return 1;
-        }
-        return 0;
-    };
-    this.up = function moveUp() {
-        if(this.y > 0){
-            this.y--;
-            return 1;
-        }
-        return 0;
-    };
-
-    this.canMoveDown = function canMoveDown() {
-        if(this.y < this.matrix[this.x].length - 1){
-            return 1;
-        }
-        return 0;
-    };
-    this.down = function moveDown() {
-        if(this.y < this.matrix[this.x].length - 1){
-            this.y++;
-            return 1;
-        }
-        return 0;
-    };
-
-    this.canMoveLeft = function canMoveLeft() {
-        if(this.x > 0){
-            return 1;
-        }
-        return 0;
-    }
-    this.left = function moveLeft() {
-        if(this.x > 0){
-            this.x--;
-            if(
-                !this.matrix[this.x][this.y]
-            ){
-                // If there is nothing on the right Case we must parse the Top map until we found a Good Case
-                while(!this.matrix[this.x][this.y]){
-                    this.y--;
+                if(screens.length > 0){
+                    nav2dScreens.push(screens);
                 }
-            }
-            return 1;
+            });
+            console.log("result ", nav2dScreens);
+            this.data["navigationSystem"] = new MatrixNavigationByDirection(nav2dScreens.reverse());
+            console.groupEnd();    
         }
-        return 0;
-    }
-
-    this.canMoveRight = function canMoveRight() {
-        if(this.x < this.matrix.length - 1){
-            return 1;
-        }
-        return 0;
-    }
-    this.right = function moveRight() {
-        if(this.x < this.matrix.length - 1){
-            this.x++;
-            if(
-                !this.matrix[this.x][this.y]
-            ){
-                // If there is nothing on the right Case we must parse the Top map until we found a Good Case
-                while(!this.matrix[this.x][this.y]){
-                    this.y--;
-                }
-            }
-            return 1;
-        }
-        return 0;
-    }
-    this.getElement = function getElement(){
-        return this.matrix[this.x][this.y];
-    }
-    this.matrix = matrix;
-    this.x = 0;
-    this.y = 0;
-};
-
-// TO CHange !!
-
-function createNavigationScreenSystem(nodesRegisterByTreeLevel) {
-    // Try Using BFS to Create all tripplets
-
-    
-
-    console.group("Navigation Screens System Creation");
-    var arrayT = Object.values(nodesRegisterByTreeLevel);
-    console.log("the length of the registry is", arrayT.length);
-    arrayT.reverse();
-    var nav2dScreens = new Array(arrayT.length - 1);
-    if(arrayT.length >= 4){
-        for(var i = 0; i < nav2dScreens.length; i++){
-            var arrayOfIndexI = arrayT[i];
-            var arrayHorizontalScreen;
-            if(i === 0){
-                arrayHorizontalScreen = new Array(arrayOfIndexI.length / 4);
-                var stepperArrayTOfIndexI = 0;
-                for (var j = 0; j < arrayHorizontalScreen.length; j++) {
-                    var screenElement = {
-                        "triplet1": new Triplet(),
-                        "triplet2": new Triplet()
-                    };
-                    var limitStepper = stepperArrayTOfIndexI + 4;
-                    if(stepperArrayTOfIndexI < limitStepper){
-                        screenElement.triplet1.subNode1 = arrayOfIndexI[stepperArrayTOfIndexI];
-                        screenElement.triplet1.subNode2 = arrayOfIndexI[stepperArrayTOfIndexI + 1];
-                        screenElement.triplet1.parentNode = arrayOfIndexI[stepperArrayTOfIndexI].parentNode;
-                        screenElement.triplet2.subNode1 = arrayOfIndexI[stepperArrayTOfIndexI + 2];
-                        screenElement.triplet2.subNode2 = arrayOfIndexI[stepperArrayTOfIndexI + 3];
-                        screenElement.triplet2.parentNode = arrayOfIndexI[stepperArrayTOfIndexI + 2].parentNode;
-                    }
-                    stepperArrayTOfIndexI = limitStepper;
-                    arrayHorizontalScreen[j] = screenElement;
-                }
-            }else {
-                arrayHorizontalScreen = new Array(arrayOfIndexI.length / 2);
-                var stepperArrayTOfIndexI = 0;
-                for (var j = 0; j < arrayHorizontalScreen.length; j++) {
-                    var screenElement = {
-                        "triplet": new Triplet()
-                    };
-                    var limitStepper = stepperArrayTOfIndexI + 2;
-                    if(stepperArrayTOfIndexI < limitStepper){
-                        screenElement.triplet.subNode1 = arrayOfIndexI[stepperArrayTOfIndexI];
-                        screenElement.triplet.subNode2 = arrayOfIndexI[stepperArrayTOfIndexI + 1];
-                        screenElement.triplet.parentNode = arrayOfIndexI[stepperArrayTOfIndexI].parentNode;
-                    }
-                    stepperArrayTOfIndexI = limitStepper;
-                    arrayHorizontalScreen[j] = screenElement;
-                }
-            }
-            nav2dScreens[i] = arrayHorizontalScreen;
-        };
-    }else{
-        // Then the arrayT has length 2
-        var screenSingleElement = {
-            "triplet": new Triplet()
-        };
-        screenSingleElement.triplet.subNode1 = arrayT[0];
-        screenSingleElement.triplet.subNode2 = arrayT[1];
-        screenSingleElement.triplet.parentNode = arrayT[0].parentNode;
-        nav2dScreens[0] = [screenSingleElement];
-    }
-    console.log("the nav2dScreens is : ", nav2dScreens);
-    console.groupEnd();
-    return new MatrixNavigationByDirection(nav2dScreens);
+    };
 };
 
 export default function Main(
@@ -617,22 +551,18 @@ export default function Main(
     // INSUFISANT_PLAYERS
     // DUPLICATED_PLAYERS No 
     // TOO MUCH PLAYERS You can have it hhh
-
     if(namesOfPlayers.length <= 1){
         tournament.data.errors.push({
             "code": "INSUFISANT_PLAYERS",
             "msg": "The generation of the tournament requires at least two players"
         });
     } else {
-        tournament.construct();
+        tournament.construct(withScreenNavigation);
         console.log("tree :", tournament.tree);
         console.log("players :", tournament.players);
         console.log("nodesRegisterByPlayer :", tournament.nodesRegisterByPlayer);
-        console.log("nodesRegisterByTreeLevel :", tournament.nodesRegisterByTreeLevel);    
-        if(withScreenNavigation){
-            tournament.data = {"navigationSystem": createNavigationScreenSystem(tournament.nodesRegisterByTreeLevel)};
-            console.log("system navigator", tournament.data);
-        }
+        console.log("nodesRegisterByTreeLevel :", tournament.nodesRegisterByTreeLevel);
+        console.log("data tournament : ", tournament.data);
     }
     console.groupEnd();
     return tournament;
