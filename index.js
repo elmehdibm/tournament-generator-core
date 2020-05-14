@@ -27,12 +27,12 @@ function NodeRegistry(){
         }
     };
     this.getNodesInLevel = (level) => {
-        if(level >= this.getDept()){
-            return null;
+        if(level < this.getDept()){
+            return Array.from(this.map[level].map(n => ({
+                ...n
+            })));    
         }
-        return Array.from(this.map[level].map(n => ({
-            ...n
-        })));
+        return null;
     };
     this.getNode = (level, position) => {
         return this.map[level].find(n => n.position === position);
@@ -62,17 +62,25 @@ function NodeRegistry(){
         this.insertNodes([node], node.level, pos);
     };
     this.insertNodes = (nodes, level, pos) => {
+        console.log("we insert the nodes in the level ", level, nodes);
+        console.log("we must position them in", pos);
+        console.log("before in the level to change", this.getNodesInLevel(level));
         if(this.map[level]){
             this.map[level].splice(
                 pos,
                 0,
                 ...nodes
             );
+            console.log("inter in the level to change", this.getNodesInLevel(level));
+            console.log("we get some node", this.getNode(level, nodes[0].position));
             (this.getNodesInLevel(level)).slice(pos).forEach((n, index) => {
-                this.getNode(level, n.position).level = level;
-                this.getNode(level, n.position).position = pos + index;
+                var node = this.getNode(level, n.position);
+                console.log("the node we want to change ", node);
+                node.level = level;
+                node.position = pos + index;
             });
         }
+        console.log("after in the level to change", this.getNodesInLevel(level));
     };
     this.insertNodesInLast = (nodes, level) => {
         if(!this.map[level]){
@@ -358,15 +366,15 @@ function TournamentBoard(players) {
             }else {
                 newRegister.removeNodes(sibblingsNearestParent, nearestParent);
             }
+            sibblingsNearestParent.position--;
             updateDescendantNodesUsingBfsBulkMode(
                 sibblingsNearestParent,
                 (nodes) => {
-                    console.log("we operate the nodes", nodes);
                     newRegister.removeNodes(...nodes);
                     newRegister.insertNodes(
                         nodes,
                         nodes[0].level - 1,
-                        nodes[0].position
+                        nodes[nodes.length - 1].parentNode.position + 1
                     );
                 }
             );
@@ -375,8 +383,8 @@ function TournamentBoard(players) {
             }
             (sibblingsNearestParent.parentNode).subNodeLeft = sibblingsNearestParent.subNodeLeft;
             (sibblingsNearestParent.parentNode).subNodeRight = sibblingsNearestParent.subNodeRight;
-            sibblingsNearestParent.subNodeLeft.parentNode = sibblingsNearestParent.parentNode;
-            sibblingsNearestParent.subNodeRight = sibblingsNearestParent.parentNode;
+            (sibblingsNearestParent.subNodeLeft).parentNode = sibblingsNearestParent.parentNode;
+            (sibblingsNearestParent.subNodeRight).parentNode = sibblingsNearestParent.parentNode;
             nearestParent = null;
             sibblingsNearestParent = null;
             console.log("The rest of nodes ", neighborsEmptyPlayers);
@@ -398,8 +406,41 @@ function TournamentBoard(players) {
                 this.nodesRegisterByPlayer[newNode.info.player.name] = newNode;
             });
             newRegister.insertNodesInLast(nodesToInsert, neighborsEmptyPlayers[0].level);
-            // End
         }
+        console.groupEnd();
+        console.group("Creation of navigation System");
+        var nav2dScreens = [];
+        var arrayT = Object.values(this.nodesRegisterByTreeLevel);
+        for (let i = arrayT.length - 1; i >= 0; i--) {
+            var screens = [];
+            var nodesInLevel = [
+                ...arrayT[i],
+            ];
+            const length = nodesInLevel.length;
+            if(length >= 4) {
+                for(let i = 0; i < length; i = i + 4){
+                    var node1 = nodesInLevel.pop();
+                    var node2 = nodesInLevel.pop();
+                    var node3 = nodesInLevel.pop();
+                    var node4 = nodesInLevel.pop();
+                    screens.push({
+                        "triplet1": new Triplet(node1.parentNode, node1, node2),
+                        "triplet2": new Triplet(node3.parentNode, node3, node4)
+                    });
+                }
+            }
+            if(length > 1 && length % 4 !== 0) {
+                var node1 = nodesInLevel.pop();
+                var node2 = nodesInLevel.pop();
+                screens.push({
+                    "tripplet": new Triplet(node3.parentNode, node3, node4)
+                });
+            }
+            if(screens.length > 0){
+                nav2dScreens.push(screens);
+            }
+        }
+        console.log("The nav2dScreens is ", nav2dScreens);
         console.groupEnd();
     };
 };
@@ -494,7 +535,13 @@ function MatrixNavigationByDirection(matrix) {
     this.y = 0;
 };
 
+// TO CHange !!
+
 function createNavigationScreenSystem(nodesRegisterByTreeLevel) {
+    // Try Using BFS to Create all tripplets
+
+    
+
     console.group("Navigation Screens System Creation");
     var arrayT = Object.values(nodesRegisterByTreeLevel);
     console.log("the length of the registry is", arrayT.length);
@@ -584,6 +631,7 @@ export default function Main(
         console.log("nodesRegisterByTreeLevel :", tournament.nodesRegisterByTreeLevel);    
         if(withScreenNavigation){
             tournament.data = {"navigationSystem": createNavigationScreenSystem(tournament.nodesRegisterByTreeLevel)};
+            console.log("system navigator", tournament.data);
         }
     }
     console.groupEnd();
