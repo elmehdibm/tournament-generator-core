@@ -506,40 +506,42 @@ function TournamentBoard(players) {
             newRegister.insertNodesInLast(nodesToInsert, neighborsEmptyPlayers[0].level);
         }
         console.groupEnd();
-        // if(withScreenNavigation){
-        //     console.group("Creation of navigation System");
-        //     var nav2dScreens = [];
-        //     updateDescendantNodesUsingBfsBulkMode(this.tree, (nodes) => {
-        //         const length = nodes.length;
-        //         var copyNodes = Array.from(nodes);
-        //         var screens = [];
-        //         if(length >= 4) {
-        //             for(let i = 0; i < length; i = i + 4){
-        //                 var node1 = copyNodes.shift();
-        //                 var node2 = copyNodes.shift();
-        //                 var node3 = copyNodes.shift();
-        //                 var node4 = copyNodes.shift();
-        //                 screens.push({
-        //                     "triplet1": new Triplet(node1.parentNode, node1, node2),
-        //                     "triplet2": new Triplet(node3.parentNode, node3, node4)
-        //                 });
-        //             }
-        //         }
-        //         if(length > 1 && length % 4 !== 0) {
-        //             var node1 = copyNodes.shift();
-        //             var node2 = copyNodes.shift();
-        //             screens.push({
-        //                 "tripplet": new Triplet(node1.parentNode, node1, node2)
-        //             });
-        //         }
-        //         if(screens.length > 0){
-        //             nav2dScreens.push(screens);
-        //         }
-        //     });
-        //     console.log("result ", nav2dScreens);
-        //     this.data["navigationSystem"] = new MatrixNavigationByDirection(nav2dScreens.reverse());
-        //     console.groupEnd();    
-        // }
+        if(withScreenNavigation){
+            console.group("Creation of navigation System");
+            var nav2dScreens = [];
+            updateDescendantNodesUsingBfsBulkMode(this.tree, (nodes) => {
+                const length = nodes.length;
+                var copyNodes = Array.from(nodes);
+                var screens = [];
+
+                if(length >= 4) {
+                    for(let i = 0; (i + 4) < length; i = i + 4){
+                        var node1 = copyNodes.shift();
+                        var node2 = copyNodes.shift();
+                        var node3 = copyNodes.shift();
+                        var node4 = copyNodes.shift();
+                        console.log(node1, node2, node3, node4);
+                        screens.push({
+                            "triplet1": new Triplet(node1.parentNode, node1, node2),
+                            "triplet2": new Triplet(node3.parentNode, node3, node4)
+                        });
+                    }
+                }
+                if(length > 1 && length % 4 !== 0) {
+                    var node1 = copyNodes.shift();
+                    var node2 = copyNodes.shift();
+                    screens.push({
+                        "tripplet": new Triplet(node1.parentNode, node1, node2)
+                    });
+                }
+                if(screens.length > 0){
+                    nav2dScreens.push(screens);
+                }
+            });
+            console.log("result ", nav2dScreens);
+            this.data["navigationSystem"] = new MatrixNavigationByDirection(nav2dScreens.reverse());
+            console.groupEnd();    
+        }
     };
 };
 
