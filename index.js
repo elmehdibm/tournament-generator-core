@@ -63,7 +63,7 @@ function NodeRegistry(){
     };
     this.insertNodes = (nodes, level, pos) => {
         console.log("we insert the nodes in the level ", level, nodes);
-        console.log("we must position them in", pos);
+        console.log("we must position them in", pos , "and in the level ", level);
         console.log("before in the level to change", this.getNodesInLevel(level));
         if(this.map[level]){
             this.map[level].splice(
@@ -75,12 +75,16 @@ function NodeRegistry(){
             console.log("we get some node", this.getNode(level, nodes[0].position));
             (this.getNodesInLevel(level)).slice(pos).forEach((n, index) => {
                 var node = this.getNode(level, n.position);
-                console.log("the node we want to change ", node);
-                node.level = level;
                 node.position = pos + index;
             });
         }
         console.log("after in the level to change", this.getNodesInLevel(level));
+        // We notice that after all the operations some nodes doesn't have the same level value
+        console.log("trying to have all the nodes");
+        this.getNodesInLevel(level).forEach(n => {
+            var node = this.getNode(level, n.position);
+            node.level = level;
+        })
     };
     this.insertNodesInLast = (nodes, level) => {
         if(!this.map[level]){
@@ -502,40 +506,40 @@ function TournamentBoard(players) {
             newRegister.insertNodesInLast(nodesToInsert, neighborsEmptyPlayers[0].level);
         }
         console.groupEnd();
-        if(withScreenNavigation){
-            console.group("Creation of navigation System");
-            var nav2dScreens = [];
-            updateDescendantNodesUsingBfsBulkMode(this.tree, (nodes) => {
-                const length = nodes.length;
-                var copyNodes = Array.from(nodes);
-                var screens = [];
-                if(length >= 4) {
-                    for(let i = 0; i < length; i = i + 4){
-                        var node1 = copyNodes.shift();
-                        var node2 = copyNodes.shift();
-                        var node3 = copyNodes.shift();
-                        var node4 = copyNodes.shift();
-                        screens.push({
-                            "triplet1": new Triplet(node1.parentNode, node1, node2),
-                            "triplet2": new Triplet(node3.parentNode, node3, node4)
-                        });
-                    }
-                }
-                if(length > 1 && length % 4 !== 0) {
-                    var node1 = copyNodes.shift();
-                    var node2 = copyNodes.shift();
-                    screens.push({
-                        "tripplet": new Triplet(node1.parentNode, node1, node2)
-                    });
-                }
-                if(screens.length > 0){
-                    nav2dScreens.push(screens);
-                }
-            });
-            console.log("result ", nav2dScreens);
-            this.data["navigationSystem"] = new MatrixNavigationByDirection(nav2dScreens.reverse());
-            console.groupEnd();    
-        }
+        // if(withScreenNavigation){
+        //     console.group("Creation of navigation System");
+        //     var nav2dScreens = [];
+        //     updateDescendantNodesUsingBfsBulkMode(this.tree, (nodes) => {
+        //         const length = nodes.length;
+        //         var copyNodes = Array.from(nodes);
+        //         var screens = [];
+        //         if(length >= 4) {
+        //             for(let i = 0; i < length; i = i + 4){
+        //                 var node1 = copyNodes.shift();
+        //                 var node2 = copyNodes.shift();
+        //                 var node3 = copyNodes.shift();
+        //                 var node4 = copyNodes.shift();
+        //                 screens.push({
+        //                     "triplet1": new Triplet(node1.parentNode, node1, node2),
+        //                     "triplet2": new Triplet(node3.parentNode, node3, node4)
+        //                 });
+        //             }
+        //         }
+        //         if(length > 1 && length % 4 !== 0) {
+        //             var node1 = copyNodes.shift();
+        //             var node2 = copyNodes.shift();
+        //             screens.push({
+        //                 "tripplet": new Triplet(node1.parentNode, node1, node2)
+        //             });
+        //         }
+        //         if(screens.length > 0){
+        //             nav2dScreens.push(screens);
+        //         }
+        //     });
+        //     console.log("result ", nav2dScreens);
+        //     this.data["navigationSystem"] = new MatrixNavigationByDirection(nav2dScreens.reverse());
+        //     console.groupEnd();    
+        // }
     };
 };
 
