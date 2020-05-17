@@ -515,7 +515,9 @@ function TournamentBoard(players) {
                 var screens = [];
 
                 if(length >= 4) {
-                    for(let i = 0; (i + 4) < length; i = i + 4){
+                    console.log("two tripplet");
+                    for(let i = 0; (i + 4) <= length; i = i + 4){
+                        console.log("Loop", i);
                         var node1 = copyNodes.shift();
                         var node2 = copyNodes.shift();
                         var node3 = copyNodes.shift();
@@ -528,15 +530,18 @@ function TournamentBoard(players) {
                     }
                 }
                 if(length > 1 && length % 4 !== 0) {
+                    console.log("one tripplet");
                     var node1 = copyNodes.shift();
                     var node2 = copyNodes.shift();
                     screens.push({
                         "tripplet": new Triplet(node1.parentNode, node1, node2)
                     });
                 }
+                console.log("the screens are", screens);
                 if(screens.length > 0){
                     nav2dScreens.push(screens);
                 }
+                console.log("the nav2dScreens is", nav2dScreens);
             });
             console.log("result ", nav2dScreens);
             this.data["navigationSystem"] = new MatrixNavigationByDirection(nav2dScreens.reverse());
